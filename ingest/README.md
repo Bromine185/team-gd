@@ -30,5 +30,5 @@ open decision). They are drafts: every memory must be hand-checked against its `
 
 ## Not here yet
 
-- Loading into Atlas: embeddings (model is an open decision) and insert-skip-on-duplicate.
+- Embeddings (model is an open decision). `python -m scripts.load_drafts` loads drafts without them.
 - The review queue.

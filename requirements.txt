@@ -1,3 +1,4 @@
 pydantic>=2.6
 PyYAML>=6
 pytest>=8
+pymongo[srv]>=4.6
