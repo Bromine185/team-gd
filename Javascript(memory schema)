@@ -1,0 +1,162 @@
+##1. Create the Collection with a Schema Validator
+
+db.createCollection("memories", {
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: ["_id", "type", "title", "content", "inferred", "source", "derived_from", "status", "owner", "created_at", "ingested_at", "embedding"],
+      properties: {
+        _id: { bsonType: "string", description: "SHA-256 hex hash" },
+        type: { enum: ["hypothesis", "run", "synthesis", "dataset", "code", "note"] },
+        title: { bsonType: "string" },
+        content: { bsonType: "string" },
+        hypothesis: { bsonType: ["string", "null"] },
+        inferred: { bsonType: "bool" },
+        config: { bsonType: ["object", "null"] },
+        key_metrics: { bsonType: ["object", "null"] },
+        outcome: { enum: ["worked", "failed", "inconclusive", null] },
+        source: {
+          bsonType: "object",
+          required: ["repo", "path", "commit_sha", "permalink"],
+          properties: {
+            repo: { bsonType: "string" },
+            path: { bsonType: "string" },
+            commit_sha: { bsonType: "string" },
+            permalink: { bsonType: "string" }
+          }
+        },
+        derived_from: { bsonType: "array", items: { bsonType: "string" } },
+        status: { enum: ["draft", "active", "suspect", "retracted", "superseded"] },
+        status_reason: { bsonType: ["string", "null"] },
+        superseded_by: { bsonType: ["string", "null"] },
+        owner: { bsonType: "string" },
+        created_at: { bsonType: "date" },
+        ingested_at: { bsonType: "date" },
+        expires_at: { bsonType: ["date", "null"] },
+        embedding: { bsonType: "array", items: { bsonType: "double" } }
+      }
+    }
+  }
+})
+
+##2. Create Indexes
+
+// Unique index on _id (auto-created, but explicit for clarity)
+db.memories.createIndex({ _id: 1 }, { unique: true })
+
+// B-tree for derived_from graph lookups
+db.memories.createIndex({ derived_from: 1 }, { name: "idx_derived_from" })
+
+// TTL index — only expires note-type documents
+db.memories.createIndex(
+  { expires_at: 1 },
+  { expireAfterSeconds: 0, partialFilterExpression: { type: "note" }, name: "idx_expires_at" }
+)
+
+// Atlas Vector Search index (run via Atlas UI or API)
+// {
+//   "name": "idx_vector_embedding",
+//   "type": "vectorSearch",
+//   "fields": [{
+//     "type": "vector",
+//     "path": "embedding",
+//     "numDimensions": 768,
+//     "similarity": "cosine",
+//     "filters": ["status", "type", "source.repo", "owner"]
+//   }]
+// }
+
+##3. Idempotent Insert (Ingestion)
+
+const _id = crypto.createHash('sha256')
+  .update(`${source.repo}${source.path}${source.commit_sha}${type}`)
+  .digest('hex')
+
+try {
+  db.memories.insertOne({ _id, /* ... rest of doc ... */ })
+} catch (err) {
+  if (err.code === 11000) {
+    // Duplicate — already ingested, skip silently
+    console.log(`Memory ${_id} already exists, skipping.`)
+  } else {
+    throw err
+  }
+}
+
+##4. Retraction Cascade (Mark Downstream as Suspect)
+
+// Step 1: Mark the target as retracted
+db.memories.updateOne(
+  { _id: retractedMemoryId },
+  { $set: { status: "retracted", status_reason: "User retracted" } }
+)
+
+// Step 2: Recursively mark all memories that derived from it as suspect
+const cascadePipeline = [
+  {
+    $graphLookup: {
+      from: "memories",
+      startWith: "$derived_from",
+      connectFromField: "_id",
+      connectToField: "derived_from",
+      as: "transitive_upstream",
+      depthField: "depth",
+      restrictSearchWithMatch: { status: { $in: ["active", "suspect"] } }
+    }
+  },
+  { $match: { "transitive_upstream._id": retractedMemoryId } },
+  { $project: { _id: 1 } }
+]
+
+const downstreamIds = db.memories.aggregate(cascadePipeline).toArray().map(d => d._id)
+
+db.memories.updateMany(
+  { _id: { $in: downstreamIds }, status: { $ne: "retracted" } },
+  { $set: { status: "suspect", status_reason: `Downstream of retracted memory ${retractedMemoryId}` } }
+)
+
+##5. Supersede (Replace Without Overwrite)
+
+const newMemory = { /* ... new version of the memory ... */ }
+newMemory.status = "active"
+
+try {
+  db.memories.insertOne(newMemory)
+  // Mark the old one as superseded
+  db.memories.updateOne(
+    { _id: oldMemoryId },
+    { $set: { status: "superseded", superseded_by: newMemory._id, status_reason: "Superseded by new version" } }
+  )
+} catch (err) {
+  // handle
+}
+
+##6. TTL Auto-Expiry for Notes (set on insert)
+
+// When inserting a note, set expires_at to e.g. 24 hours from now
+db.memories.insertOne({
+  _id: "...",
+  type: "note",
+  expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000),
+  // ... other fields
+})
+
+##7. Pre-filtered Vector Search Query
+
+db.memories.aggregate([
+  {
+    $vectorSearch: {
+      index: "idx_vector_embedding",
+      path: "embedding",
+      queryVector: [/* your query embedding */],
+      numCandidates: 100,
+      limit: 10,
+      filter: {
+        status: "active",
+        type: { $in: ["run", "synthesis", "hypothesis"] }
+      }
+    }
+  },
+  { $project: { title: 1, content: 1, hypothesis: 1, outcome: 1, score: { $meta: "vectorSearchScore" } } }
+])
+
