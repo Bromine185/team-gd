@@ -1,0 +1,195 @@
+/* Main layout */
+#root {
+  width: 100%;
+  min-height: 100vh;
+}
+
+.app {
+  display: flex;
+  width: 100%;
+  min-height: 100vh;
+  background: #f5f6fb;
+  color: #202338;
+}
+
+.sidebar {
+  flex: 0 0 260px;
+  padding: 24px 18px;
+  background: #fff;
+  border-right: 1px solid #e5e7ef;
+}
+
+.sidebar h2 {
+  margin: 0 0 32px;
+  font-size: 22px;
+}
+
+.new-chat {
+  width: 100%;
+  padding: 12px;
+  color: #fff;
+  background: #6558df;
+  border: none;
+  border-radius: 10px;
+}
+
+.sidebar-label {
+  margin-top: 32px;
+  color: #9296a8;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.chat-item {
+  padding: 12px;
+  background: #f0efff;
+  color: #6558df;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.chat {
+  flex: 1;
+  min-width: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 28px;
+  background: white;
+  border-bottom: 1px solid #e5e7ef;
+}
+
+.avatar,
+.welcome-icon {
+  display: grid;
+  place-items: center;
+  background: #6558df;
+  color: white;
+  border-radius: 12px;
+}
+
+.avatar {
+  width: 42px;
+  height: 42px;
+}
+
+.header h3,
+.header p {
+  margin: 0;
+}
+
+.header h3 {
+  font-size: 15px;
+}
+
+.header p {
+  margin-top: 5px;
+  color: #9296a8;
+  font-size: 12px;
+}
+
+.online {
+  margin-left: auto;
+  color: #20a879;
+  font-size: 12px;
+}
+
+.messages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 30px;
+}
+
+.welcome {
+  margin: auto;
+  text-align: center;
+}
+
+.welcome-icon {
+  width: 60px;
+  height: 60px;
+  margin: 0 auto;
+  font-size: 26px;
+}
+
+.welcome h1 {
+  margin-top: 24px;
+  font-size: 27px;
+}
+
+.welcome p {
+  color: #9296a8;
+}
+
+.user-message {
+  align-self: flex-end;
+  max-width: 75%;
+  padding: 14px 18px;
+  background: #6558df;
+  color: white;
+  border-radius: 16px 16px 4px 16px;
+  overflow-wrap: anywhere;
+}
+
+.composer {
+  display: flex;
+  gap: 12px;
+  width: calc(100% - 48px);
+  max-width: 850px;
+  margin: 0 auto 24px;
+  padding: 12px;
+  background: white;
+  border: 1px solid #e0e2eb;
+  border-radius: 14px;
+}
+
+.composer input {
+  flex: 1;
+  min-width: 0;
+  padding: 12px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: #202338;
+}
+
+.composer button {
+  padding: 12px 20px;
+  background: #6558df;
+  color: white;
+  border: none;
+  border-radius: 9px;
+}
+
+@media (max-width: 600px) {
+  .sidebar {
+    flex-basis: 155px;
+    padding: 16px 10px;
+  }
+
+  .header {
+    padding: 14px;
+  }
+
+  .messages {
+    padding: 16px;
+  }
+
+  .welcome h1 {
+    font-size: 21px;
+  }
+
+  .composer {
+    width: calc(100% - 20px);
+  }
+}
