@@ -1,0 +1,747 @@
+repo: Bromine185/lisa-rtm
+owner: Bromine185
+memories:
+  # ------------------------------------------------------------------ datasets
+  - key: vctk-datashare-fixtures
+    type: dataset
+    title: DataShare VCTK 0.92 fixtures (10 train speakers p225-p234, held-out p236/p237/p238), cached as .npz
+    content: |
+      The original notebook's data. build_split() pulls selected speakers' FLACs out of the Edinburgh DataShare
+      VCTK-Corpus-0.92.zip (fetch_vctk over HTTP ranges, ~11 GB archive) and caches each split as an .npz. The
+      FULL preset trains on 10 speakers p225-p234 and holds out p236, p237, p238. The held-out cache
+      (test_FULL.npz in the notes) is the "DataShare" evaluation set used by every Mac-side local evaluation
+      (4 Sep lambda frontier, 8 Sep sampler analysis, wide-context test). Per TODO.md the DataShare URL no
+      longer serves the archive, and the same checkpoint measures a deeper high-band deficit on the Hub route
+      than on this cache for the same speakers, with the provenance unresolved (see two-test-set-discrepancy).
+    hypothesis: null
+    inferred: false
+    config: {source: "datashare.ed.ac.uk VCTK-Corpus-0.92.zip", train_speakers: [p225, p226, p227, p228, p229, p230, p231, p232, p233, p234], test_speakers: [p236, p237, p238], preset: FULL}
+    key_metrics: null
+    outcome: null
+    path: build_notebook.py
+    derived_from: []
+    evidence: "build_notebook.py: FULL Config (train_speakers p225-p234, test_speakers p236-p238), VCTK_URL, fetch_vctk(), build_split(); TODO.md 'Resolve the two-test-set discrepancy' and '403' items"
+
+  - key: vctk-hub-corpus
+    type: dataset
+    title: Full VCTK mic1 corpus from the HF Hub (sanchit-gandhi/vctk), 39,639 utterances, 37.32 h
+    content: |
+      The training corpus for every run from 4 Sep onward (4 Sep lambda frontier, 8 Sep OV2 sampler, OV3_fast,
+      OV50): VCTK mic1 from the Hugging Face dataset sanchit-gandhi/vctk, 48 kHz, peak-normalised to 0.95,
+      downsampled by R = 4 to 12 kHz inputs. The OV50 manifest records n = 39639 utterances and 37.32 hours,
+      with p236/p237/p238 held out (1285 test utterances) and 2961 paper-split test utterances; the OV50 batch
+      stream is fingerprinted by a corpus digest so every VM trains on the identical corpus.
+    hypothesis: null
+    inferred: false
+    config: {repo: sanchit-gandhi/vctk, fs_hi: 48000, R: 4, peak: 0.95, test_speakers: [p236, p237, p238]}
+    key_metrics: {n_utterances: 39639, hours: 37.32, n_test_utts_p236_p238: 1285, n_paper_test_utts: 2961}
+    outcome: null
+    path: overnight3/results_OV50/manifest.json
+    derived_from: []
+    evidence: "overnight3/results_OV50/manifest.json fields repo, n, hours, test_speakers, n_test_utts, n_paper_test, g3.corpus; loader in overnight/cell1_corpus.py"
+
+  - key: heldout-speaker-splits
+    type: dataset
+    title: Held-out evaluation splits on the Hub corpus - EVAL12, ours120 (p236-p238) and paper100 (id >= 350)
+    content: |
+      Speaker-disjoint evaluation sets cut from the Hub corpus. EVAL12 = test_utts[:12] (first 12 Hub
+      utterances of p236-p238; the "Hub" set in the 8 Sep note and the EVAL12 of OV3_fast/OV50); ours120 = all
+      p236-p238 test utterances; paper100 = 100 utterances spread over paper_test_utts, LISA's own held-out
+      split (the speaker-id threshold is set in overnight/cell1_corpus.py). Every number in the repo after 4 Sep names one of these or the DataShare cache, because the same
+      checkpoint measures differently on them.
+    hypothesis: null
+    inferred: false
+    config: {eval12: "test_utts[:12]", ours120: "test_utts (p236-p238)", paper100: "spread(paper_test_utts, 100)"}
+    key_metrics: null
+    outcome: null
+    path: overnight2/c3_eval.py
+    derived_from: [vctk-hub-corpus]
+    evidence: "overnight2/c3_eval.py lines defining EVAL12 and PAPER100, and the eval12 / ours120 / paper100 calls to ensemble_eval; speaker roles (OUR_TEST, PAPER_TEST_MIN = 350) in overnight/cell1_corpus.py"
+
+  - key: audit-vctk-fixtures
+    type: dataset
+    title: Audit fixtures - a few VCTK 0.92 utterances per speaker pulled by HTTP range from DataShare
+    content: |
+      audit/vctk_fixtures.py reads only the requested members of the 11 GB VCTK 0.92 archive over HTTP range
+      requests into lisa_rtm_cache/audit/. PAPER_TEST = p351, p360, p361, p362, p363, p364, p374, p376 (LISA's
+      validation split, speaker id >= 350); OUR_TEST = p236, p237, p238. fetch(speakers, per_speaker) takes
+      each speaker's first files in sorted order. These fixtures feed the LISA reported-numbers audit, the SNR
+      ceiling/scale audit, the band-gating measurement and the envelope regression.
+    hypothesis: null
+    inferred: false
+    config: {paper_test: [p351, p360, p361, p362, p363, p364, p374, p376], our_test: [p236, p237, p238]}
+    key_metrics: null
+    outcome: null
+    path: audit/vctk_fixtures.py
+    derived_from: []
+    evidence: "audit/vctk_fixtures.py module docstring, PAPER_TEST / OUR_TEST constants, RangeFile and fetch()"
+
+  - key: sota-wide-test-set
+    type: dataset
+    title: NU-Wave 2 / FLowHigh test speakers (p360-p364, p374, p376, s5), files spread through each script
+    content: |
+      The evaluation set for the released-SOTA audit. sota/fetch_wide.py takes per_speaker files (default 30)
+      evenly spaced through each speaker's sorted list for the eight NU-Wave 2 / FLowHigh test speakers,
+      because audit/vctk_fixtures.fetch() takes each speaker's first files and VCTK's first ~24 prompts are the
+      same sentences for every speaker. Stored in lisa_rtm_cache/audit_wide/ so earlier audit numbers stay
+      untouched.
+    hypothesis: null
+    inferred: false
+    config: {speakers: [p360, p361, p362, p363, p364, p374, p376, s5], per_speaker: 30}
+    key_metrics: null
+    outcome: null
+    path: sota/fetch_wide.py
+    derived_from: []
+    evidence: "sota/fetch_wide.py docstring and SPEAKERS constant"
+
+  # ------------------------------------------------------------------ code
+  - key: lisa-reimplementation
+    type: code
+    title: LISA reimplementation (conv encoder + 5-layer ReLU MLP local implicit decoder) and core metrics
+    content: |
+      build_notebook.py generates lisa_rtm.ipynb and holds the reimplementation of LISA (Kim et al., ICASSP
+      2022, ~89k params): LISAEncoder (1-D convs), LISADecoder (MLP on [coord, z(i-1), z(i), z(i+1)]),
+      MultiScaleSTFTLoss over three scales, and the shared metric definitions snr_db, lsd_db,
+      band_energy_ratio (with frame_mask), crps_ensemble, pit_ranks, spread_skill. Config sets lambda_spec =
+      1e-3 (the official code's spec_coeff), Adam lr 1e-3 halved at 0.2/0.4/0.5/0.6/0.7/0.8 of steps,
+      grad_clip 1e-3; FULL preset batch 16, 20000 steps. Every later script (overnight*, audit/boot.py,
+      sota/score.py) execs these cells for its model and metric definitions.
+    hypothesis: null
+    inferred: false
+    config: {lambda_spec: 1e-3, lr: 1e-3, lr_milestones: [0.2, 0.4, 0.5, 0.6, 0.7, 0.8], lr_gamma: 0.5, grad_clip: 1e-3, batch_size: 16, steps: 20000}
+    key_metrics: null
+    outcome: null
+    path: build_notebook.py
+    derived_from: []
+    evidence: "build_notebook.py classes LISAEncoder/LISADecoder/LISA/MultiScaleSTFTLoss, metric defs snr_db..spread_skill, FULL Config"
+
+  - key: transport-ladder-notebook
+    type: code
+    title: Post-hoc optimal-transport ladder T0-T4 and stochastic rung S on high-band log-magnitude
+    content: |
+      lisa_rtm.ipynb (generated by build_notebook.py) fits post-hoc maps from the model's high-band
+      log-magnitude distribution to the truth's: T0 identity, T1 per-bin quantile map (exact 1-D OT), T2
+      Bures-Wasserstein (diag/block), T3 conditional location-scale on frame covariates, T4 McCann
+      interpolation (1-lambda) Id + lambda T, and S, noise pushed through a conditional map (the only rung that
+      produces samples). Includes closed-form OT unit tests run before data, and adversarial controls in the
+      results table: shaped noise, a deliberately mis-specified T1, and a frame shuffle.
+    hypothesis: null
+    inferred: false
+    config: null
+    key_metrics: null
+    outcome: null
+    path: lisa_rtm.ipynb
+    derived_from: [lisa-reimplementation]
+    evidence: "lisa_rtm.ipynb sections 5 and 10-12 (QuantileMap, BuresMap, ConditionalMap, Interpolated, controls); source in build_notebook.py"
+
+  - key: lisas-sampler
+    type: code
+    title: LISAS - LISA with 8 Gaussian input channels trained under the two-draw energy score
+    content: |
+      overnight2/c1_model.py defines LISAS (LISA plus N_NOISE = 8 Gaussian channels at the encoder input;
+      eps = 0 recovers LISA exactly), the training objectives (det, det_split, es_marg, es_slice, es_wave) with
+      the two-draw energy score ES = (d(y,y1)+d(y,y2))/2 - d(y1,y2)/2, the distances d_wave/d_logmag/d_sliced,
+      HostCorpus, the paired trainer train_ov2, and load_arm. load_arm sets tau = 0 iff ck["arm"][0]
+      startswith "det", which silently mis-reads checkpoints whose arm field is a string (found and worked
+      around for OV50 by fast/convert_ckpt.py). sampler/build_sampler_notebook.py packages the same recipe as
+      the self-contained Colab deliverable.
+    hypothesis: null
+    inferred: false
+    config: {n_noise: 8, draws_per_step: 2, det_lambda: 1e-2}
+    key_metrics: null
+    outcome: null
+    path: overnight2/c1_model.py
+    derived_from: [lisa-reimplementation]
+    evidence: "overnight2/c1_model.py header comment (objectives), class LISAS, arm_loss, train_ov2, load_arm"
+
+  - key: coherence-diagnostics
+    type: code
+    title: Coherent fraction, kappa, predictability spectrum rho(f) and deterministic SNR bound
+    content: |
+      overnight2/analysis_local.py is the independent CPU analysis that computes, per arm, the coherent
+      fraction Re<Y,P>/<Y,Y> per high-band third octave (the predictable fraction), kappa = Re<Y,P>/<P,P>,
+      the energy-based predictable fraction bias-corrected for an M-draw mean, the predictability spectrum rho,
+      the deterministic SNR bound implied by rho, plus CRPS / sliced CRPS / PIT. It execs the notebook's
+      definition cells and reads the DataShare test cache. The same coherent() estimator is copied into
+      overnight3/e4_eval.py and reused by sota/score.py.
+    hypothesis: null
+    inferred: false
+    config: {default_M: 32, default_n_utts: 36}
+    key_metrics: null
+    outcome: null
+    path: overnight2/analysis_local.py
+    derived_from: [lisa-reimplementation, lisas-sampler]
+    evidence: "overnight2/analysis_local.py docstring, band_cross() docstring, rho / snr_bound_db / predictable_hb_fraction block"
+
+  - key: ov3-erb-decnoise-model
+    type: code
+    title: OV3 model additions - LISASD decoder noise, ERB-band distance d_erb, logmean ensemble readout
+    content: |
+      overnight3/e1_model.py extends c1_model.py: LISASD adds N_DEC = 4 Gaussian channels per output sample at
+      the decoder input; es_erb / es_marg_erb add an L1 distance on log ERB-band energies (32 bands, three STFT
+      scales), the space ViSQOL's audio-mode neurogram lives in; es_ged and es_split variants; and
+      logmag_ensemble_readout (mean of log|STFT| over M draws, phase of draw 0, baseband passed through). Used
+      by OV3_fast, OV50 (via ArmStack in overnight3/e2b_fast.py) and the SOTA scorer.
+    hypothesis: null
+    inferred: false
+    config: {n_dec: 4, erb_bands: 32}
+    key_metrics: null
+    outcome: null
+    path: overnight3/e1_model.py
+    derived_from: [lisas-sampler]
+    evidence: "overnight3/e1_model.py header comment, class LISASD, erb_filterbank/d_erb, logmag_ensemble_readout"
+
+  - key: ov3-eval-script
+    type: code
+    title: e4_eval.py - EVAL12 evaluation (CRPS, PIT, coherence, readouts, passthrough, floor/ceiling)
+    content: |
+      overnight3/e4_eval.py evaluates every OV3/OV50 arm on EVAL12: one draw and a 16-draw ensemble (CRPS,
+      sliced CRPS on 32 fixed directions, PIT, spread-skill, ensemble-mean metrics, coherent fraction and
+      kappa), the logmean16 / logmean4 readouts, every condition again with baseband passthrough, and the
+      model-independent floor (passthrough + empty high band) and ceiling (passthrough + true high band) rows.
+      It loads checkpoints through c1_model's load_arm.
+    hypothesis: null
+    inferred: false
+    config: {M_draws: 16, sliced_directions: 32, n_groups: 16}
+    key_metrics: null
+    outcome: null
+    path: overnight3/e4_eval.py
+    derived_from: [lisa-reimplementation, lisas-sampler, ov3-erb-decnoise-model]
+    evidence: "overnight3/e4_eval.py header comment, coherent(), passthrough(), floor_ceiling(), load_ov3()"
+
+  - key: visqol-eval-pipeline
+    type: code
+    title: LSD + ViSQOL (speech 16 kHz and audio 48 kHz) + PESQ evaluation of every condition
+    content: |
+      overnight2/c6_visqol_eval.py judges every 8 Sep condition with the user's evaluation.py: ViSQOL speech
+      mode at 16 kHz (which after resampling sees only 6-8 kHz of the reconstructed 6-24 kHz band), ViSQOL
+      audio mode at 48 kHz (sees the whole band), and wideband PESQ, keeping per-utterance values for paired
+      comparisons. overnight3/e5_visqol.py reuses the same evaluation.py call path for OV3 and OV50.
+    hypothesis: null
+    inferred: false
+    config: {speech_mode_sr: 16000, audio_mode_sr: 48000}
+    key_metrics: null
+    outcome: null
+    path: overnight2/c6_visqol_eval.py
+    derived_from: [lisa-reimplementation]
+    evidence: "overnight2/c6_visqol_eval.py header comment; overnight3/e5_visqol.py header ('same call path as overnight2/c6_visqol_eval.py')"
+
+  - key: ov50-fast-trainer
+    type: code
+    title: OV50 one-arm-per-process resumable trainer and the eight-arm run contract
+    content: |
+      fast/train_arm.py trains one arm per process, resumably, on a staged corpus, exec'ing ArmStack from
+      overnight3/e2b_fast.py verbatim as the numerical contract (energy-score estimator, distances, per-arm
+      clip, sub-pixel decoder) and owning only the loop, because train_ov3_fast cannot resume. fast/run_contract.py
+      fixes BATCH_TAG / VAL_TAG so all eight arms on eight VMs draw identical batches, guarded by a cross-machine
+      digest.
+    hypothesis: null
+    inferred: false
+    config: null
+    key_metrics: null
+    outcome: null
+    path: fast/train_arm.py
+    derived_from: [ov3-erb-decnoise-model, lisas-sampler]
+    evidence: "fast/train_arm.py docstring 'REUSE THE MATH, OWN THE LOOP'; fast/run_contract.py docstring"
+
+  - key: lisa-paper-protocol-script
+    type: code
+    title: audit/lisa_paper_protocol.py - LISA's own resampler, SNR and LSD reimplemented, no model
+    content: |
+      Reimplements torchaudio 0.6.0's kaldi.resample_waveform (the only resampler in ml-postech/LISA) and
+      LISA's utils.calc_snr / compute_log_distortion from source, applies eval_lisa.py's chunking, and reports:
+      the response of Resample(48000, 48000) on the ground truth, the protocol's ceiling (perfect low band,
+      empty high band) and where naive sits, the variance created by the `if ii == 3` single-batch evaluation,
+      LISA's LSD against the conventional one, and how much of their LSD is pinned at its epsilon floor. By
+      design it depends on nothing in this repo's model code.
+    hypothesis: null
+    inferred: false
+    config: null
+    key_metrics: null
+    outcome: null
+    path: audit/lisa_paper_protocol.py
+    derived_from: []
+    evidence: "audit/lisa_paper_protocol.py module docstring items 1-5; audit/README.md last paragraph"
+
+  - key: sota-scorer
+    type: code
+    title: sota/score.py - one scorer for released BWE checkpoints and our arms
+    content: |
+      Scores every model's saved draws on one set of utterances with one scorer: levels (LSD in two bases,
+      per-third-octave deficit, broadband deficit, loud/mid/quiet gated deficit), SNR vs the empty-band
+      ceiling, coherent fraction and kappa (e4_eval.coherent), CRPS and fair CRPS, PIT tails, spread-skill,
+      the SNR gap and the independent-draw gap, corr_err, and ViSQOL/PESQ. Metric definitions come from the
+      notebook via audit.boot, so columns match the OV50 datasheet. Each draw is gain-matched below 5.5 kHz.
+    hypothesis: null
+    inferred: false
+    config: {gain_match_below_hz: 5500}
+    key_metrics: null
+    outcome: null
+    path: sota/score.py
+    derived_from: [lisa-reimplementation, ov3-eval-script, ov3-erb-decnoise-model]
+    evidence: "sota/score.py module docstring (INPUT, GAIN, CONDITIONS, COLUMNS AND IDEALS)"
+
+  # ------------------------------------------------------------------ runs: 1 Sep
+  - key: lam1-phase-blind-run
+    type: run
+    title: Original repro at lambda_spec = 1.0 - right magnitudes, random phase, SNR -5.8 dB
+    content: |
+      LISA reimplementation trained 20k steps on the DataShare fixtures (10 speakers) with the multi-scale
+      STFT term at lambda = 1.0, 1000x the official code's 1e-3. The spectral term was 92 % of the loss and the
+      waveform L1 rose from 0.0557 to 0.0836. Held-out SNR -5.77 dB (worse than silence) while
+      prediction-magnitude + target-phase resynthesis scored +15.69 dB: correct spectrogram, random waveform.
+      Band-energy gates could not see it; SNR could.
+    hypothesis: "A deterministic loss on a one-to-many problem makes the high band regress to the conditional mean (H1); the run was the first test of the repro."
+    inferred: false
+    config: {lambda_spec: 1.0, steps: 20000, batch: 16}
+    key_metrics: {snr_db_heldout_p236_238: -5.77, snr_db_train: -5.84, spec_share_of_loss_pct: 92, phase_swap_snr_db_heldout: 15.69}
+    outcome: failed
+    path: notes/2026-09-01-eval-audit-and-objective.md
+    derived_from: [vctk-datashare-fixtures, lisa-reimplementation]
+    evidence: "notes/2026-09-01-eval-audit-and-objective.md §2.1-2.4 tables (same-code-path audit, phase swap, loss terms)"
+
+  - key: lam1e-3-retrain
+    type: run
+    title: Retrain at lambda = 1e-3 - phase fixed, model becomes a sinc interpolator, HB deficit -19.55 dB
+    content: |
+      Same 0.54 h DataShare training set, lambda_spec = 1e-3, MultiStepLR, 20k steps on an A100. Phase is now
+      correct but the high band collapses: SNR 18.13 dB vs naive 18.16 (gate 2a fails by 0.03 dB), HB deficit
+      -19.55 dB, LSD 1.609 (worse than the broken lambda=1.0 model's 1.36). The model emits nothing above 6 kHz;
+      regression to the conditional median observed directly. Paper reports 24.16 dB.
+    hypothesis: "Matching the official lambda = 1e-3 fixes the waveform and reproduces LISA's SNR."
+    inferred: true
+    config: {lambda_spec: 1e-3, steps: 20000, train_hours: 0.538}
+    key_metrics: {snr_db_test_full: 18.13, snr_naive_db_test_full: 18.16, hb_deficit_db_test_full: -19.55, lsd_test_full: 1.609}
+    outcome: failed
+    path: notes/2026-09-01-eval-audit-and-objective.md
+    derived_from: [vctk-datashare-fixtures, lisa-reimplementation]
+    evidence: "notes/2026-09-01-eval-audit-and-objective.md §2.7 (§9 block) and §3"
+
+  - key: ladder-degenerate-source
+    type: run
+    title: Transport ladder on the lambda=1e-3 model - T1 'wins' HB-LSD but the mis-specified control wins too
+    content: |
+      Ladder run on the degenerate lambda=1e-3 source (12 held-out DataShare utterances). T1 quantile moved
+      HB-LSD 1.846 -> 1.226, but the deliberately mis-specified T1 control also improved it to 1.370 because T0
+      sits on the epsilon floor above 6 kHz, so HB-LSD rewards any energy injection. CRPS deterministic 1.352
+      -> stochastic rung 1.134. Declared pipeline evidence only; "do not quote".
+    hypothesis: "Transport maps on low-order high-band statistics correct the deficit (H2); only the stochastic rung moves a proper score (H3)."
+    inferred: false
+    config: {source: "FULL_lam0.001 checkpoint"}
+    key_metrics: {hb_lsd_t0_test_full: 1.846, hb_lsd_t1_test_full: 1.226, hb_lsd_misspecified_t1_test_full: 1.370, crps_det_test_full: 1.352, crps_stochastic_test_full: 1.134}
+    outcome: inconclusive
+    path: notes/2026-09-01-eval-audit-and-objective.md
+    derived_from: [lam1e-3-retrain, transport-ladder-notebook, vctk-datashare-fixtures]
+    evidence: "notes/2026-09-01-eval-audit-and-objective.md §2.8 ladder table and §4 rows H2/H3"
+
+  # ------------------------------------------------------------------ runs: 4 Sep
+  - key: lambda-frontier-sep04
+    type: run
+    title: 4 Sep lambda frontier on the 37.3 h Hub corpus - lambda=1e-2 gives a muffled-but-coherent source
+    content: |
+      Four paired arms on identical batches (batch 64, 1 s chunks, 36,000 steps = 17.1 epochs, A100): ReLU
+      decoder at lambda 1e-3 / 1e-2 / 1e-1 plus a Fourier-feature control. On the DataShare cache (36 utts)
+      the HB deficit is monotone in lambda: -17.42 / -4.52 / -2.35 dB, with SNR 19.16 / 18.37 / 17.69 vs naive
+      19.20 and LSD 1.546 / 0.962 / 0.948. On paper100 relu_l1e-2 scores LSD 0.865 vs the paper's 0.81. No arm
+      beats naive upsampling; no generalisation gap (bias-limited). The same checkpoint measures -4.5 dB on the
+      DataShare cache and -10.0 dB on the 120 Hub utterances, so every deficit must name its set.
+    hypothesis: "H1': the deficit is large enough to matter at paper scale; a lambda exists where SNR > naive and the high band is structured but under-energetic."
+    inferred: false
+    config: {batch: 64, chunk_s: 1, steps: 36000, epochs: 17.1, lambdas: [1e-3, 1e-2, 1e-1]}
+    key_metrics: {deficit_db_l1e-3_datashare36: -17.42, deficit_db_l1e-2_datashare36: -4.52, deficit_db_l1e-1_datashare36: -2.35, snr_db_l1e-2_datashare36: 18.37, snr_naive_db_datashare36: 19.20, lsd_l1e-2_datashare36: 0.962, lsd_l1e-2_paper100: 0.865, deficit_db_l1e-2_hub120: -10.03}
+    outcome: worked
+    path: notes/2026-09-04-overnight-lambda-frontier.md
+    derived_from: [vctk-hub-corpus, heldout-speaker-splits, vctk-datashare-fixtures, lisa-reimplementation]
+    evidence: "notes/2026-09-04-overnight-lambda-frontier.md §0 run table, §1 local table and §1.0 all-splits table (also overnight/table_allsplits.md, overnight/local_eval_XL4.json)"
+
+  - key: fourier-feature-control
+    type: run
+    title: Fourier-feature decoder control - ReLU spectral bias is not the cause (0.6 dB on a 17 dB hole)
+    content: |
+      Same encoder, latents, loss (lambda 1e-3), batches and seed as relu_l1e-3; only the decoder sees
+      [c, sin(pi k c), cos(pi k c)] for k = 1..6. DataShare cache: deficit -16.84 vs -17.42 dB, LSD 1.486 vs
+      1.546, SNR identical. Fourier features do not rescue the high band; over-smoothing comes from objective
+      and data, not decoder spectral bias. Struck from the notebook's open list.
+    hypothesis: "LISA's ReLU MLP decoder has spectral bias that is a second, architectural cause of over-smoothing."
+    inferred: false
+    config: {decoder: "Fourier features k=1..6", lambda_spec: 1e-3}
+    key_metrics: {deficit_db_ff_datashare36: -16.84, deficit_db_relu_datashare36: -17.42, lsd_ff_datashare36: 1.486, lsd_relu_datashare36: 1.546}
+    outcome: failed
+    path: notes/2026-09-04-overnight-lambda-frontier.md
+    derived_from: [vctk-hub-corpus, vctk-datashare-fixtures, lisa-reimplementation]
+    evidence: "notes/2026-09-04-overnight-lambda-frontier.md §1.3 and §1 table rows ff_l1e-3 / relu_l1e-3"
+
+  - key: ladder-coherent-source
+    type: run
+    title: Transport ladder on the coherent lambda=1e-2 source - deterministic rungs buy 1.7 %, S buys 21.3 % CRPS
+    content: |
+      The ladder rerun on relu_l1e-2 (deficit -13.2 dB on this eval set) next to the degenerate relu_l1e-3.
+      Best rung T1 moves HB-LSD 1.057 -> 1.039 (-1.7 %) for -0.41 dB SNR, versus -42 % on the degenerate
+      source; the mis-specified T1 control now hurts (1.167 vs T0 1.057), confirming the earlier 'win' was
+      energy inflation. The stochastic rung S still cuts CRPS 0.957 -> 0.753 (-21.3 %). H2 (deterministic
+      transport) largely fails on an honest source; H3 supported.
+    hypothesis: "On a coherent, under-energetic source, deterministic transport maps (T1-T3) correct the deficit; only the stochastic rung moves a proper score."
+    inferred: false
+    config: {source: relu_l1e-2}
+    key_metrics: {hb_lsd_t0_heldout: 1.057, hb_lsd_t1_heldout: 1.039, hb_lsd_misspecified_heldout: 1.167, crps_det_heldout: 0.957, crps_stochastic_heldout: 0.753, crps_reduction_pct: 21.3}
+    outcome: failed
+    path: notes/2026-09-04-overnight-lambda-frontier.md
+    derived_from: [lambda-frontier-sep04, transport-ladder-notebook, heldout-speaker-splits]
+    evidence: "notes/2026-09-04-overnight-lambda-frontier.md §2.5 table and §3 rows H2/H3"
+
+  # ------------------------------------------------------------------ runs: 8 Sep
+  - key: ov2-energy-score-sampler
+    type: run
+    title: 8 Sep OV2 - LISA trained under the energy score is a sampler; CRPS -43 % (Hub), -32 % (DataShare)
+    content: |
+      Five arms on identical batches, 38,000 steps of batch 32 x 1 s (9.1 epochs of the Hub corpus). es_marg
+      (energy score, d = L1 wave + 1e-2 L1 log|STFT|) cuts high-band log-magnitude CRPS 1.015 -> 0.583 vs det
+      on Hub EVAL12 (-43 %) and 1.011 -> 0.686 on DataShare (-32 %), at zero inference cost. Its ensemble mean
+      is a better point predictor: SNR 18.90 vs 18.86 (Hub) and 18.78 vs 18.35 (DataShare). Single draw has no
+      deficit on DataShare (+0.6 dB) but is -7.9 dB in-distribution on Hub (under-dispersed in energy at 9
+      epochs). Latency 1.51 ms per second of audio on an A100, 16.5 ms on an Apple M4 CPU.
+    hypothesis: "If the network itself is trained as the transport map under a strictly proper score, it becomes a calibrated conditional sampler at zero inference cost; (1) its ensemble mean has det's deficit; (2) a single draw has no deficit."
+    inferred: false
+    config: {steps: 38000, batch: 32, chunk_s: 1, epochs: 9.1, n_noise: 8, spectral_weight: 1e-2, M_hub: 16, M_datashare: 32}
+    key_metrics: {crps_det_hub_eval12: 1.015, crps_es_marg_hub_eval12: 0.583, crps_det_datashare36: 1.011, crps_es_marg_datashare36: 0.686, mean_snr_db_es_marg_hub: 18.90, snr_db_det_hub: 18.86, mean_snr_db_es_marg_datashare: 18.78, snr_db_det_datashare: 18.35, deficit_db_es_marg_one_draw_hub: -7.9, deficit_db_es_marg_one_draw_datashare: 0.6}
+    outcome: worked
+    path: notes/2026-09-08-network-as-transport-map.md
+    derived_from: [lisas-sampler, vctk-hub-corpus, heldout-speaker-splits, vctk-datashare-fixtures, coherence-diagnostics]
+    evidence: "notes/2026-09-08-network-as-transport-map.md §1.1 both tables (rows det, es_marg), §1.2, §3 latency table"
+
+  - key: ov2-alternative-arms
+    type: run
+    title: 8 Sep alternative arms - det_split, es_wave and es_slice all lose to es_marg
+    content: |
+      det_split (L1 on the low-passed waveform + MS-STFT, the practitioner's deterministic fix) restores energy
+      (DataShare deficit -2.3 dB) with kappa 0.03 and moves CRPS only 4 %: energy without information.
+      es_wave (waveform-only energy score) gets energy right (-0.6 dB DataShare) and structure wrong: LSD 1.32
+      vs 1.03, cross-bin correlation error 1.75 vs 0.62. es_slice (sliced score, proper for the joint law of a
+      frame) converged slower and was under-dispersed (PIT top bin 41 % on Hub), CRPS 0.782 vs 0.583 on Hub.
+    hypothesis: "A low-band-only waveform term, a waveform-only score, or a joint (sliced) score would do as well as or better than the marginal log-magnitude energy score."
+    inferred: true
+    config: {arms: [det_split, es_wave, es_slice], sliced_directions: 64}
+    key_metrics: {deficit_db_det_split_datashare36: -2.3, crps_es_slice_hub_eval12: 0.782, crps_es_wave_hub_eval12: 0.733, corr_err_es_wave_hub: 1.75, pit_top_bin_es_slice_hub_pct: 41}
+    outcome: failed
+    path: notes/2026-09-08-network-as-transport-map.md
+    derived_from: [lisas-sampler, vctk-hub-corpus, heldout-speaker-splits, vctk-datashare-fixtures]
+    evidence: "notes/2026-09-08-network-as-transport-map.md §1.1 tables (rows det_split, es_slice, es_wave) and §1.2 paragraphs 'geometry of the score' and 'band-split fix'"
+
+  - key: coherent-fraction-ceiling
+    type: run
+    title: The band above 6 kHz is incoherent - coherent fraction <= 2 %, deterministic ceiling 0.3 dB above naive
+    content: |
+      Cross-power coherence of every 8 Sep arm against the truth: coherent fraction by third octave from 6 kHz
+      for det on Hub EVAL12 is 0.050, 0.002, 0.002, 0.001, -0.000, 0.002 (the 5 % is the anti-aliasing
+      transition); every arm within +-0.003. det's kappa 0.06-0.12, so at least 88 % of the energy the spectral
+      loss puts above 6 kHz is uncorrelated with the truth. The implied deterministic SNR bound is 19.5 dB on
+      DataShare vs naive 19.20; no deterministic LISA trained in the project beats naive. Prediction (1) - the
+      ensemble mean has det's deficit - is false (-16.6 dB Hub, -10.0 dB DataShare).
+    hypothesis: "The ensemble mean's deficit equals the deterministic model's and is a predictability spectrum; the deterministic deficit measures predictability."
+    inferred: false
+    config: null
+    key_metrics: {coherent_fraction_hb_max_pct: 2, snr_bound_db_datashare36: 19.5, snr_naive_db_datashare36: 19.20, hallucinated_energy_min_pct: 88, ensemble_mean_deficit_db_hub: -16.6, ensemble_mean_deficit_db_datashare: -10.0}
+    outcome: worked
+    path: notes/2026-09-08-network-as-transport-map.md
+    derived_from: [ov2-energy-score-sampler, coherence-diagnostics, vctk-datashare-fixtures, lambda-frontier-sep04]
+    evidence: "notes/2026-09-08-network-as-transport-map.md §1.2 (prediction 1, 'unpredictable at the waveform level') and §4.1; raw values in overnight2/analysis_OV2_es.json"
+
+  - key: wide-context-test
+    type: run
+    title: Receptive-field test (LISASW, 22 ms context) - context does not make the high band coherent
+    content: |
+      LISASW adds dilated residual convs (receptive field 263 input samples = 22 ms, +11k params) and trains the
+      paper loss and es_marg on the same batches for 26,000 steps. DataShare: coherent fraction above 7 kHz stays
+      0.000-0.005 for both; wide_det SNR 18.39 vs 18.35 (ceiling 19.5), LSD improves 0.03 via the envelope.
+      wide_es_marg is over-dispersed (+3.4 dB, SNR gap 4.46 vs calibrated 2.88). Hub: wide_det SNR 18.82 vs
+      18.86. Falsified: the 11-sample window is not why the band is unpredictable.
+    hypothesis: "LISA's 11-sample (0.9 ms) receptive field is why the high band is incoherent; more context would make it predictable."
+    inferred: false
+    config: {receptive_field_samples: 263, context_ms: 22, extra_params: 11000, steps: 26000}
+    key_metrics: {snr_db_wide_det_datashare36: 18.39, snr_db_det_datashare36: 18.35, lsd_wide_det_datashare36: 0.931, crps_wide_es_marg_datashare36: 0.654, deficit_db_wide_es_marg_datashare36: 3.4}
+    outcome: failed
+    path: notes/2026-09-08-network-as-transport-map.md
+    derived_from: [lisas-sampler, coherence-diagnostics, vctk-hub-corpus, heldout-speaker-splits, vctk-datashare-fixtures]
+    evidence: "notes/2026-09-08-network-as-transport-map.md §1.4 table and following paragraphs; overnight2/colab_results/results_OV2_wide.json"
+
+  - key: ladder-vs-learned-sampler
+    type: run
+    title: Hand-built stochastic rung S vs learned sampler on Hub EVAL12 - CRPS 0.753 vs 0.583
+    content: |
+      The notebook's ladder (fitted on 200 training-speaker utterances) run on the 8 Sep det arm, same 12 Hub
+      utterances and CRPS definition. T1 quantile: HB-LSD 1.061, deficit -8.0 dB; T3: CRPS 0.982; S (noise
+      through the closed-form conditional map): CRPS 0.753; es_marg (noise through the learned map): CRPS 0.583,
+      a further 23 % off the rung. Controls behaved (mis-specified map 1.176 vs T0 1.097). Every rung except S is
+      strictly dominated by the learned sampler, and S is dominated on CRPS.
+    hypothesis: "A network trained as the transport map beats the hand-built conditional transport rung on CRPS."
+    inferred: true
+    config: {ladder_fit_utts: 200, draws: 16}
+    key_metrics: {crps_t0_det_hub_eval12: 1.015, crps_s_rung_hub_eval12: 0.753, crps_es_marg_hub_eval12: 0.583, hb_lsd_t1_hub_eval12: 1.061}
+    outcome: worked
+    path: notes/2026-09-08-network-as-transport-map.md
+    derived_from: [ov2-energy-score-sampler, transport-ladder-notebook, heldout-speaker-splits]
+    evidence: "notes/2026-09-08-network-as-transport-map.md §1.3 table; overnight2/colab_results/ladder_OV2_es_det.json"
+
+  - key: gnn-toy-oversmoothing
+    type: run
+    title: Graph toy - objective- vs architecture-induced over-smoothing separated by one sampler
+    content: |
+      600-node 8-NN graph, unpredictable target component in modes >= 200. Shallow GNN + MSE loses 15.5 dB in
+      modes 200-400; the energy score restores it in one draw (-1.4 dB) and the ensemble mean reopens the hole
+      (-13.0 dB); a deep 8-layer no-skip GNN cannot restore it under any objective (-16.4 dB one draw). Second
+      experiment (per-node CRPS vs Euclidean vs sliced energy score) refuted the prediction that the joint
+      scores place noise in better bands: all three agree within a decibel.
+    hypothesis: "Over-smoothing has an objective-induced cause independent of depth; a joint-proper score puts noise in the right graph-frequency bands where a marginal score does not."
+    inferred: false
+    config: {nodes: 600, knn: 8, deep_layers: 8, ensemble: 32}
+    key_metrics: {deficit_db_shallow_mse_modes200_400: -15.5, deficit_db_shallow_es_draw_modes200_400: -1.4, deficit_db_shallow_es_mean_modes200_400: -13.0, deficit_db_deep_es_draw_modes200_400: -16.4, crps_shallow_es: 0.356, crps_shallow_mse: 0.468}
+    outcome: worked
+    path: notes/2026-09-08-network-as-transport-map.md
+    derived_from: []
+    evidence: "notes/2026-09-08-network-as-transport-map.md §2 table and §2.1 table; overnight2/gnn_toy_results.json"
+
+  - key: visqol-judging-sep08
+    type: run
+    title: 8 Sep conditions judged by LSD + ViSQOL - speech-mode metrics blind to the band, passthrough fixes sampler
+    content: |
+      29 conditions x 48 utterances re-scored. Speech-mode ViSQOL/PESQ cannot judge 12->48 kHz: on DataShare
+      naive upsampling scores best (ViSQOL-sp 4.245, PESQ 4.39). Audio-mode ViSQOL at 48 kHz rewards
+      deterministic high-band energy monotonically: winners are lambda=1e-1 on Hub (3.02, 46 % of the
+      empty-to-true range 1.57-4.73) and wide_det on DataShare. With baseband passthrough the sampler's
+      speech-ViSQOL penalty disappears (Hub one draw 3.06 -> 4.11) and its LSD beats det (0.933 vs 0.956): the
+      penalty was baseband leakage. No single model wins both CRPS and LSD+ViSQOL.
+    hypothesis: "The sampler that wins CRPS also wins on the user's primary metrics LSD and ViSQOL."
+    inferred: true
+    config: {conditions: 29, utterances: 48}
+    key_metrics: {visqol_speech_naive_datashare: 4.245, visqol_audio_l1e-1_hub: 3.02, visqol_audio_floor: 1.57, visqol_audio_ceiling: 4.73, visqol_speech_es_marg_hub_before_pt: 3.06, visqol_speech_es_marg_hub_after_pt: 4.11, lsd_es_marg_hub_pt: 0.933, lsd_det_hub_pt: 0.956}
+    outcome: inconclusive
+    path: notes/2026-09-08-network-as-transport-map.md
+    derived_from: [visqol-eval-pipeline, ov2-energy-score-sampler, lambda-frontier-sep04, wide-context-test, ladder-vs-learned-sampler, vctk-datashare-fixtures, heldout-speaker-splits]
+    evidence: "notes/2026-09-08-network-as-transport-map.md §7.1-§7.4 tables; overnight2/visqol_results/visqol_tables.md"
+
+  # ------------------------------------------------------------------ runs: 16-17 Sep
+  - key: ov3-fast-erb-logmean
+    type: run
+    title: OV3_fast - ERB-band energy score + logmean16 readout is the first arm to win both families
+    content: |
+      7 arms x 16,000 steps, batch 64 x 1 s (7.6 epochs), EVAL12, M = 16, all with baseband passthrough.
+      es_erb_l0.1 read out as logmean16 scores CRPS 0.612, LSD 0.871, audio ViSQOL 2.773 (38.2 % of range) vs
+      det's 1.318 / 1.198 / 2.483: CRPS -53.6 %, LSD -27.3 %, +0.290 ViSQOL for -0.14 dB SNR. logmean16 improves
+      LSD for all six samplers (P7) but improves ViSQOL only for the two ERB arms: the readout must match the
+      aggregate the score is proper for. ERB arms are best calibrated (PIT end bins 0.211, kappa -0.009).
+    hypothesis: "A score proper for the judge's own aggregate (log ERB-band energies), read out as the log-magnitude ensemble mean, improves CRPS, calibration, LSD and audio ViSQOL together."
+    inferred: false
+    config: {arms: 7, steps: 16000, batch: 64, epochs: 7.6, M: 16, spectral_weight: 1e-1}
+    key_metrics: {crps_es_erb_l0.1_eval12: 0.612, lsd_es_erb_l0.1_logmean16_eval12: 0.871, visqol_audio_es_erb_l0.1_eval12: 2.773, crps_det_eval12: 1.318, lsd_det_eval12: 1.198, visqol_audio_det_eval12: 2.483, pit_end_es_erb_l0.1: 0.211}
+    outcome: worked
+    path: notes/2026-09-16-score-geometry-decoder-noise-readouts.md
+    derived_from: [ov3-erb-decnoise-model, ov3-eval-script, visqol-eval-pipeline, vctk-hub-corpus, heldout-speaker-splits]
+    evidence: "notes/2026-09-16-score-geometry-decoder-noise-readouts.md §3.1 scoreboard, §3.2 readout table, §3.3 calibration"
+
+  - key: ov3-refuted-predictions
+    type: run
+    title: OV3_fast negatives - higher spectral weight, low-band waveform term and decoder noise all refuted
+    content: |
+      Four of seven pre-registered predictions refuted. P1: es_marg_l0.1 is worse than es_marg on LSD (1.004 vs
+      0.946), ViSQOL and CRPS (+15.5 %). P2: es_split_l0.1's deficit is larger (-15.18 vs -13.00 dB) - its noise
+      became decoration. P4: decoder noise leaves deficit at -10.79 dB; zeroing the decoder-noise draw moves
+      es_dec_erb_l0.1's output 74.7 dB below the signal, so trained LISASD models ignore their decoder noise.
+      P5: es_dec_erb_l0.1 is not the best arm. The geometry of the score was the lever, not the noise pathway.
+    hypothesis: "P1 raising the spectral weight to 1e-1, P2 removing the waveform term above 6 kHz, P4 decoder-side noise each close the in-distribution energy gap."
+    inferred: false
+    config: {arms: [es_marg_l0.1, es_split_l0.1, es_dec_l0.1, es_dec_erb_l0.1]}
+    key_metrics: {lsd_es_marg_l0.1_eval12: 1.004, lsd_es_marg_eval12: 0.946, crps_increase_es_marg_l0.1_pct: 15.5, deficit_db_es_split_l0.1: -15.18, deficit_db_es_marg_l0.1: -13.00, deficit_db_es_dec_l0.1: -10.79, decoder_noise_effect_db_below_signal: 74.7}
+    outcome: failed
+    path: notes/2026-09-16-score-geometry-decoder-noise-readouts.md
+    derived_from: [ov3-erb-decnoise-model, ov3-eval-script, vctk-hub-corpus, heldout-speaker-splits]
+    evidence: "notes/2026-09-16-score-geometry-decoder-noise-readouts.md §2 predictions, §3.5 verdict table, §4 'Why decoder noise added nothing'"
+
+  - key: lisa-reported-numbers-audit
+    type: run
+    title: LISA's reported 24.16 dB is 3.16 dB above the task's ceiling and is scored on one batch of 8 s
+    content: |
+      Under LISA's own Kaldi resampler, chunking and per-chunk-dB calc_snr on eight of its own held-out
+      speakers (391 chunks), the empty-high-band ceiling is 21.00 dB and naive sinc upsampling 20.67 dB; the
+      paper reports 24.16. eval_lisa.py scores only batch `ii == 3` (eight 1-s chunks); a sinc interpolator's
+      batch-to-batch sd is 3.63 dB and it scores >= 24.16 dB on 12.5 % of consecutive batches, against a claimed
+      4.75 dB margin over WSRGlow. Their LSD logs |X|^4 and pins 16.6 % of bins at the epsilon floor (2.213 vs
+      conventional 5.172 on the same signal). Aliasing hypothesis refuted: their downsampling is anti-aliased.
+    hypothesis: "The paper's 24.16 dB comes from an SNR convention or down-sampling operator (e.g. aliased input), not from the model."
+    inferred: false
+    config: {chunks: 391, speakers: [p351, p360, p361, p362, p363, p364, p374, p376]}
+    key_metrics: {ceiling_snr_db_paper_protocol: 21.00, naive_snr_db_paper_protocol: 20.67, lisa_reported_snr_db: 24.16, batch_sd_db: 3.63, p_naive_batch_ge_24_16_pct: 12.5, lsd_floor_pinned_pct: 16.6, lisa_lsd_naive: 2.213, conventional_lsd_naive: 5.172}
+    outcome: worked
+    path: notes/2026-09-17-lisa-reported-numbers-audit.md
+    derived_from: [lisa-paper-protocol-script, audit-vctk-fixtures]
+    evidence: "notes/2026-09-17-lisa-reported-numbers-audit.md §0, §2 'Not aliasing', §3.3 table, §4 ceiling block, §5 batch block"
+
+  - key: snr-ceiling-audit
+    type: run
+    title: SNR cannot rank models on 12->48 kHz - naive is the zero-recovery optimum to within 0.1 dB
+    content: |
+      On 64 held-out utterances, SNR as a function of the coherently recovered high-band fraction: 0 % -> 19.11
+      dB, 2 % (this model class) -> 19.19, 10 % -> 19.56, 50 % -> 22.12; naive sinc measures 19.01. The whole
+      achievable range is about 1 dB on top of a 4.32 dB per-utterance spread, and every dB of incoherent high
+      band a model restores costs SNR (4 Sep lambda sweep: 19.16 / 18.37 / 17.69 as the deficit closes). SNR
+      retired as a ranking metric; report it only beside naive on the same audio.
+    hypothesis: null
+    inferred: false
+    config: {utterances: 64}
+    key_metrics: {snr_db_zero_recovery: 19.11, snr_db_naive: 19.01, snr_db_2pct_recovery: 19.19, snr_db_10pct_recovery: 19.56, per_utt_spread_db: 4.32}
+    outcome: worked
+    path: notes/2026-09-17-snr-ceiling-gating-and-scale.md
+    derived_from: [audit-vctk-fixtures, lisa-reimplementation, coherent-fraction-ceiling, lambda-frontier-sep04]
+    evidence: "notes/2026-09-17-snr-ceiling-gating-and-scale.md §1 both tables; script audit/snr_scale.py"
+
+  - key: band-gating-single-utt
+    type: run
+    title: High band does not gate with speech (one utterance, es_erb_l0.1) - later corrected across 12 utterances
+    content: |
+      On es_erb_l0.1 at step 13500, one utterance (p236_002): high-band energy ratio -11.68 dB on loud frames
+      and +0.99 dB on quiet frames, a 12.7 dB swing hidden by the mean deficit of -10.87 dB. Low-passing the
+      draw at 8 kHz buys 0.10 dB SNR and costs 25 dB of deficit, so the demo audio should not be low-passed.
+      The note read the gating as the sampler's defect; the 16 Sep note's 12-utterance, 7-arm measurement later
+      found every sampler gates better than det, correcting that reading.
+    hypothesis: "The sampler's hiss comes from a high band that sits at a constant level instead of gating with the speech."
+    inferred: false
+    config: {arm: es_erb_l0.1, step: 13500, utterance: p236_002}
+    key_metrics: {hb_ratio_db_loud_frames: -11.68, hb_ratio_db_quiet_frames: 0.99, swing_db: 12.7, mean_deficit_db: -10.87}
+    outcome: inconclusive
+    path: notes/2026-09-17-snr-ceiling-gating-and-scale.md
+    derived_from: [audit-vctk-fixtures, ov3-erb-decnoise-model, lisa-reimplementation]
+    evidence: "notes/2026-09-17-snr-ceiling-gating-and-scale.md §2 low-pass table and §2.1 gating table; correction in notes/2026-09-16-score-geometry-decoder-noise-readouts.md §3.4"
+
+  # ------------------------------------------------------------------ runs: 21 Sep onward
+  - key: envelope-is-the-deficit
+    type: run
+    title: The deficit is a compressed envelope, and the envelope is 88 % predictable from the low band
+    content: |
+      Regressing each OV3_fast arm's log high-band frame energy on the truth's (12 utterances, six held-out
+      speakers): slope below 1 for every arm (0.746-0.861) with r 0.86-0.93 - compressed variance, not wrong
+      assignment; the ERB term fixed the sd ratio (0.829 -> 0.996). On the truth alone, a 16-band low-band
+      profile predicts the 16 high ERB band energies with leave-one-speaker-out R^2 0.882. A fitted linear
+      rescale takes det past every sampler's raw LSD; a global per-band gain zeroes the mean deficit but adds
+      7 dB in the silences (a fraud detector). Fixing the envelope buys all of the deficit; fixing fine
+      structure buys 41 % of HB-LSD.
+    hypothesis: "The loud/quiet deficit is compressed variance (regression to the mean one level up) rather than wrong assignment, and the high-band envelope is predictable from the low band."
+    inferred: false
+    config: {utterances: 12, speakers: 6, checkpoint_step: 16000}
+    key_metrics: {slope_es_marg: 0.746, slope_det: 0.860, sd_ratio_es_erb_l0.1: 0.996, r2_loso_envelope: 0.882, residual_sd_db: 6.19}
+    outcome: worked
+    path: notes/2026-09-21-envelope-is-the-deficit.md
+    derived_from: [ov3-fast-erb-logmean, ov3-erb-decnoise-model, audit-vctk-fixtures]
+    evidence: "notes/2026-09-21-envelope-is-the-deficit.md §2 table, §3 block, §4 rescale table, §5 swap table"
+
+  - key: ov50-eight-arm-run
+    type: run
+    title: OV50 (50 epochs, 8 arms) - samplers halve the deficit but are not calibrated; ViSQOL edge gone
+    content: |
+      Eight arms, 104,950 steps each on identical batches, evaluated on EVAL12 (CPU, converted checkpoints).
+      Best sampler es_dec_erb_l0.1: CRPS 0.5700 vs det 0.9597, deficit -6.85 vs -12.61 dB, logmean16+pt LSD
+      0.835 vs det 0.910, audio ViSQOL 3.021 vs det 3.001 (46.0 % vs 45.4 % of range). The 16 Sep ViSQOL margin
+      of 0.290 shrank to 0.020: det gained +0.518 with 6.5x more training. Calibration fails: PIT end bins 1.55x
+      ideal at best with all excess in the top bin (an energy bias), SNR gap 0.69-1.04 vs 2.75. det_paper
+      (LISA's lambda = 0) has deficit -27.63 dB. PESQ ranks det_paper and naive 2nd/3rd of 43 conditions.
+    hypothesis: "At 50 epochs the ERB/decoder-noise samplers clear the 16 Sep rule: improve CRPS, calibration, LSD and audio ViSQOL together."
+    inferred: false
+    config: {arms: 8, steps: 104950, epochs: 50, M: 16}
+    key_metrics: {crps_es_dec_erb_l0.1_eval12: 0.5700, crps_det_eval12: 0.9597, deficit_db_es_erb_l0.1_eval12: -6.26, deficit_db_det_eval12: -12.61, lsd_logmean16_pt_es_dec_erb_eval12: 0.835, lsd_pt_det_eval12: 0.910, visqol_audio_es_dec_erb_eval12: 3.021, visqol_audio_det_eval12: 3.001, deficit_db_det_paper_eval12: -27.63}
+    outcome: inconclusive
+    path: notes/2026-09-21-eval-results.md
+    derived_from: [ov50-fast-trainer, ov3-eval-script, visqol-eval-pipeline, lisas-sampler, vctk-hub-corpus, heldout-speaker-splits]
+    evidence: "notes/2026-09-21-eval-results.md EVAL12 table, ViSQOL table, 'Against the 16 Sep run', 'Does the sampler programme clear its own bar?'; overnight3/results_OV50/table_OV50.md"
+
+  - key: sota-released-models-audit
+    type: run
+    title: Four released BWE models through one scorer - FLowHigh is a regressor, NU-Wave 2 samples 8-9 dB too quietly
+    content: |
+      FLowHigh, AP-BWE, NU-Wave 2 and AudioSR, released weights and own inference code, scored on the
+      NU-Wave 2/FLowHigh test speakers (240 utterances for levels/LSD/ViSQOL, 32 x 8 draws for calibration).
+      FLowHigh ranks first on LSD/ViSQOL (0.761/3.61) yet its 8-draw gap is 0.08 dB against 1.77 for
+      independent draws at its level: one Euler step returns the conditional mean. NU-Wave 2 deficit -7.96 dB;
+      AudioSR biased by band, gap 2.62 vs 3.92. Our 88k sampler: deficit -0.70 dB, fair CRPS 0.514. Empty-band
+      SNR ceiling 22.02 dB at 12 kHz; every model has coherent fraction below 0.02.
+    hypothesis: "Released generative BWE models are not calibrated samplers of the missing band; single-reference metrics cannot tell a sampler from a regressor."
+    inferred: false
+    config: {level_utterances: 240, calib_utterances: 32, draws: 8}
+    key_metrics: {lsd_flowhigh_wide: 0.761, visqol_flowhigh_wide: 3.61, gap_db_flowhigh_core: 0.08, gap_indep_db_flowhigh_core: 1.77, deficit_db_nuwave2_wide: -7.96, gap_db_audiosr_core: 2.62, deficit_db_ours_sampler_wide: -0.70, crps_fair_ours_sampler_core: 0.514, snr_ceiling_db_12k: 22.02}
+    outcome: worked
+    path: paper/main.tex
+    derived_from: [sota-scorer, sota-wide-test-set, ov50-eight-arm-run]
+    evidence: "paper/main.tex Setup, 'Level Before Dispersion', Table 1 (tab:released), 'What the Audit Finds'"
+
+  # ------------------------------------------------------------------ hypothesis
+  - key: envelope-context-arm-hypothesis
+    type: hypothesis
+    title: Pre-registered ENV arms - context + per-frame HB log-energy score should stop level regressing per utterance
+    content: |
+      After the SOTA audit found each utterance's level regressing toward the corpus mean (over 270 utterances
+      es_dec_erb_l0.1 r = -0.41, slope -0.29 dB per dB; det r = -0.42), predictions were written before
+      training ENV arms (fast/arms_env.py, fast/train_env.py): P5 es_ctx_env_l0.1 lifts the deficit's
+      correlation with the utterance's HB share above -0.2 and closes loud-frame deficits on p236/p238 to better
+      than -3 dB; P6 context moves it more than the objective; P7 neither changes the coherent fraction (stays
+      below 0.03). No results are recorded in the repo.
+    hypothesis: "A 22 ms context plus a per-frame high-band log-energy energy score fixes per-utterance level regression (P5); context matters more than the objective (P6); coherent fraction stays below 0.03 (P7)."
+    inferred: false
+    config: {arms: [es_ctx_env_l0.1, es_ctx_erb_l0.1, es_env_l0.1], control: es_dec_erb_l0.1}
+    key_metrics: {baseline_r_es_dec_erb_270utts: -0.41, baseline_slope_es_dec_erb_270utts: -0.29}
+    outcome: null
+    path: notes/2026-09-26-sota-diagnosis.md
+    derived_from: [envelope-is-the-deficit, sota-scorer, ov50-eight-arm-run]
+    evidence: "notes/2026-09-26-sota-diagnosis.md section 'The residual: level regresses per utterance', bullets P5-P7"
+
+  # ------------------------------------------------------------------ syntheses
+  - key: transport-ladder-superseded-by-sampler
+    type: synthesis
+    title: Post-hoc transport ladder superseded by the learned sampler - a map on a point prediction is still a point
+    content: |
+      The original programme corrected LISA's high-band deficit after training with transport maps T0-T4 and a
+      stochastic rung S. On an honest source T1 moved HB-LSD by 1.7 % and S moved CRPS by 21 %; the LISAS
+      sampler trained under the energy score moved CRPS by 43 % and dominates every rung. The notebook is kept
+      for three surviving lessons: LSD rewards regression to the log-domain mean, gates before data, and
+      adversarial controls (shaped noise, mis-specified map, frame shuffle) that caught LSD rewarding energy
+      inflation.
+    hypothesis: "Optimal-transport maps on low-order high-band statistics can correct regression to the mean after training."
+    inferred: false
+    config: null
+    key_metrics: {hb_lsd_t1_improvement_pct_honest_source: 1.7, crps_s_rung_reduction_pct: 21, crps_sampler_reduction_pct_hub: 43}
+    outcome: failed
+    path: README.md
+    derived_from: [ladder-degenerate-source, ladder-coherent-source, ladder-vs-learned-sampler, ov2-energy-score-sampler]
+    evidence: "README.md section 'The earlier programme: post-hoc transport maps (superseded)'"
+
+  - key: lsd-rewards-regression-to-mean
+    type: synthesis
+    title: LSD structurally rewards regression to the log-domain mean and is never trusted alone
+    content: |
+      A perfect sampler scores ~2x worse in expected squared error than the conditional-mean predictor, so LSD
+      ranks samplers below point predictors by construction. Evidence across the repo: the broken lambda=1.0
+      model beat the correct one on LSD, a mis-specified map beat shaped noise on HB-LSD, and LISA (89k,
+      deterministic) reports LSD 0.81 against WSRGlow's 1.01, partly because LISA's LSD code logs |X|^4 and pins
+      16.6 % of the spectrogram at its epsilon floor. Band-energy ratio measures the disease, CRPS the cure; LSD
+      is reported but not compared across papers.
+    hypothesis: "H4: LSD rewards energy matching / regression to the log-domain mean and must not be primary evidence."
+    inferred: false
+    config: null
+    key_metrics: {lisa_reported_lsd: 0.81, wsrglow_reported_lsd: 1.01, lisa_lsd_floor_pinned_pct: 16.6}
+    outcome: worked
+    path: README.md
+    derived_from: [lam1-phase-blind-run, lam1e-3-retrain, ladder-degenerate-source, lambda-frontier-sep04, lisa-reported-numbers-audit, visqol-judging-sep08]
+    evidence: "README.md numbered item 1 under 'The earlier programme'; detail in notes/2026-09-01 §3 and notes/2026-09-17-lisa-reported-numbers-audit.md §3.3"
+
+  - key: two-test-set-discrepancy
+    type: synthesis
+    title: Hub and DataShare held-out sets disagree by 5-8 dB on the same checkpoint - provenance unresolved
+    content: |
+      The same checkpoint measures a high-band deficit 5-8 dB deeper on the Hub test_utts than on the DataShare
+      test_FULL.npz for the same speakers (both mic1); the 8 Sep sampler is energy-calibrated on one and
+      under-dispersed on the other. Until provenance is settled every number must name its set. The DataShare
+      fetch URL also returns 403, so the cache cannot be rebuilt from the notebook. Open TODO.
+    hypothesis: null
+    inferred: false
+    config: null
+    key_metrics: {deficit_gap_db_min: 5, deficit_gap_db_max: 8}
+    outcome: inconclusive
+    path: TODO.md
+    derived_from: [lambda-frontier-sep04, ov2-energy-score-sampler, vctk-datashare-fixtures, vctk-hub-corpus]
+    evidence: "TODO.md 'Resolve the two-test-set discrepancy' bullet and the two '403' bullets"
