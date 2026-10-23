@@ -1,0 +1,203 @@
+repo: Bromine185/NST_exp-
+owner: Bromine185
+memories:
+  - key: style-content-images
+    type: dataset
+    title: Style/content image pair (Starry Night style, Valensole lavender-field content)
+    content: |
+      All NST notebooks use one style image, Van Gogh's "Starry Night" (Wikimedia Google Art Project JPG),
+      and one content image, a lavender-field sunset near Valensole (.avif). Both were uploaded to the Colab
+      /content directory and are not in the repo. Images are resized and center-cropped to 384 px (512 px in
+      notebook 01) and ImageNet-normalised. Note: notebook 01's wget fallback produced a 0-byte style.jpg, so
+      the notebook read the uploaded /content copy. Notebook 02's fallback content URL is an unrelated PNG
+      transparency demo, so the result depends on the upload being present.
+    hypothesis: null
+    inferred: false
+    config: {style: Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg, content: lavender-field-sunset-near-valensole_268835-3910.avif, img_size: 384}
+    key_metrics: null
+    outcome: null
+    path: 02_style_bakeoff.ipynb
+    derived_from: []
+    evidence: "02_style_bakeoff.ipynb cells 3-4 (image copy/wget, IMG_SIZE=384); 01_gaussianity_test (1).ipynb cell 2 output 'style.jpg size: 0 bytes', cell 4 loads /content/Van_Gogh... at size 512"
+
+  - key: vgg19-features
+    type: code
+    title: VGG19 feature extractor at the five Gatys style layers
+    content: |
+      torchvision VGG19 (IMAGENET1K_V1 weights, frozen, eval mode) truncated after relu5_1, returning
+      activations at relu1_1, relu2_1, relu3_1, relu4_1 and relu5_1 (feature indices 1, 6, 11, 20, 29), the
+      layers Gatys uses for the style loss. The same class is copied into all three notebooks. Content loss
+      uses relu4_1.
+    hypothesis: null
+    inferred: false
+    config: {backbone: vgg19, weights: IMAGENET1K_V1, layers: [relu1_1, relu2_1, relu3_1, relu4_1, relu5_1], content_layer: relu4_1}
+    key_metrics: null
+    outcome: null
+    path: 01_gaussianity_test (1).ipynb
+    derived_from: []
+    evidence: "01_gaussianity_test (1).ipynb cells 3-4 (VGGFeatures, layer_ids); identical class in 02_style_bakeoff.ipynb cell 4"
+
+  - key: style-losses
+    type: code
+    title: Three style losses - Gram (Gatys), AdaIN mean+std, sliced Wasserstein (random projections)
+    content: |
+      Gatys loss: MSE between Gram matrices normalised by C*H*W, summed over the five layers. AdaIN loss: MSE
+      of per-channel means plus MSE of per-channel stds. Sliced Wasserstein (Heitz et al. 2021): project the
+      HW x C feature cloud onto n_proj random unit directions, sort, and take the MSE (1-D W2 squared per
+      projection). A fresh set of random directions is drawn on every call. The stylize() loop starts from
+      the content image and optimises pixels on style_w * style + content_w * content (relu4_1).
+    hypothesis: null
+    inferred: false
+    config: {sw_n_proj_default: 64, gram_norm: C*H*W}
+    key_metrics: null
+    outcome: null
+    path: 02_style_bakeoff.ipynb
+    derived_from: [vgg19-features]
+    evidence: "02_style_bakeoff.ipynb cell 6 (gram, gatys_loss, adain_loss, first sliced_wasserstein_loss) and cell 9 (stylize with LBFGS)"
+
+  - key: sw-loss-fixed-projections
+    type: code
+    title: Sliced Wasserstein loss redefined with fixed seeded projections (for L-BFGS)
+    content: |
+      Every notebook that runs SW redefines sliced_wasserstein_loss straight after the original. The new version
+      draws its projection directions from a generator seeded 42 + layer index, so they are the same on every
+      call, "for L-BFGS line search to work". It also adds 1e-8 to the norm and prints NaN/inf. The SW
+      objective is therefore a fixed set of n_proj 1-D marginals, not a stochastic estimate of the full sliced
+      distance: 16 directions in the notebook 02 runs, 64 in notebook 03. All SW-optimised outputs, and the
+      notebook 03 SW yardstick when evaluated after this cell, use this version.
+    hypothesis: null
+    inferred: false
+    config: {seed: 42 + layer_index, n_proj_bakeoff: 16, n_proj_nb03: 64}
+    key_metrics: null
+    outcome: null
+    path: 02_style_bakeoff.ipynb
+    derived_from: [style-losses]
+    evidence: "02_style_bakeoff.ipynb cell 7 (gen_rng.manual_seed(42 + i)); same redefinition in 02_style_bakeoff (1).ipynb cell 6 and 03_distribution_analysis_(1).ipynb cell 7"
+
+  - key: hyp-vgg-features-gaussian
+    type: hypothesis
+    title: Gram/AdaIN moment matching is only justified if VGG features are Gaussian
+    content: |
+      Gatys, AdaIN and WCT match only the first and second moments of VGG activations. That matches the whole
+      distribution only if the per-channel distributions are Gaussian. Post-ReLU activations are non-negative
+      and sparse, so the assumption is suspect a priori. If features are not Gaussian, a loss that matches the
+      full distribution (sliced Wasserstein) should give visibly and measurably different stylisations from Gram
+      and AdaIN.
+    hypothesis: VGG post-ReLU features are not Gaussian, so first+second-moment style losses discard distributional information that a full-distribution loss (sliced Wasserstein) recovers.
+    inferred: false
+    config: null
+    key_metrics: null
+    outcome: null
+    path: 01_gaussianity_test (1).ipynb
+    derived_from: []
+    evidence: "01_gaussianity_test (1).ipynb cell 0 (motivation) and cell 9; 02_style_bakeoff.ipynb cell 1 ('If VGG features were Gaussian, all three should produce visually similar outputs')"
+
+  - key: run-gaussianity-test
+    type: run
+    title: "Gaussianity test of VGG19 features on Starry Night: 0% of channels Gaussian at every layer"
+    content: |
+      Per-channel statistics of VGG19 activations on the 512 px style image, 5,000 sampled positions per
+      channel, D'Agostino K^2 test at p > 0.05. The fraction of exact zeros is 0.37, 0.62, 0.68, 0.81 and 0.78
+      from relu1_1 to relu5_1. Mean |skew| is 2.06 to 4.99 and excess kurtosis 10.87 to 39.51. No channel at any
+      layer passes the normality test (0.0%). relu2_1 skew and kurtosis are NaN, probably from constant
+      (all-zero) channels; this was not investigated. Single image, single seed.
+    hypothesis: VGG post-ReLU features are not Gaussian.
+    inferred: false
+    config: {img_size: 512, n_samples_per_channel: 5000, test: dagostino_k2, alpha: 0.05, seed: 0}
+    key_metrics: {pct_channels_gaussian_all_layers: 0.0, zero_frac_relu1_1: 0.37, zero_frac_relu4_1: 0.81, kurtosis_relu1_1: 10.87, kurtosis_relu4_1: 39.51, kurtosis_relu5_1: 37.2}
+    outcome: worked
+    path: 01_gaussianity_test (1).ipynb
+    derived_from: [style-content-images, vgg19-features, hyp-vgg-features-gaussian]
+    evidence: "01_gaussianity_test (1).ipynb cell 6 output table (layer / mean_zeros / |skew| / kurt / %chan Gaussian)"
+
+  - key: run-bakeoff-lbfgs
+    type: run
+    title: Style bake-off with L-BFGS - Gatys vs AdaIN vs SW (16 fixed projections)
+    content: |
+      Same content, style and optimiser for three losses: L-BFGS with strong-Wolfe line search, lr 1.0, max_iter
+      250, pixels initialised from the content image, 384 px. Style weights are Gatys 1e6, AdaIN 1e2 and SW 1e3
+      (n_proj=16, fixed seeded projections). Losses at step 240: Gatys style 1.855e-06 / content 4.173;
+      AdaIN style 5.493e-03 / content 6.646; SW style 1.259e-02 / content 6.256. The comparison is visual only
+      (style_bakeoff.png, not committed). The notebook records no verdict.
+    hypothesis: If VGG features were Gaussian, all three losses should produce visually similar outputs.
+    inferred: false
+    config: {optimizer: LBFGS, line_search: strong_wolfe, lr: 1.0, max_iter: 250, img_size: 384, style_w_gatys: 1.0e6, style_w_adain: 1.0e2, style_w_sw: 1.0e3, sw_n_proj: 16, seed: 42}
+    key_metrics: {gatys_content_loss_step240: 4.173, adain_content_loss_step240: 6.646, sw_content_loss_step240: 6.256, sw_style_loss_step240: 0.01259}
+    outcome: inconclusive
+    path: 02_style_bakeoff.ipynb
+    derived_from: [style-content-images, vgg19-features, style-losses, sw-loss-fixed-projections, hyp-vgg-features-gaussian]
+    evidence: "02_style_bakeoff.ipynb cell 9 (stylize, LBFGS), cells 10-11 outputs (step 240 losses), cell 13 (reading guide, no verdict)"
+
+  - key: run-bakeoff-adamw
+    type: run
+    title: Style bake-off rerun with AdamW (lr 0.1, 240 steps) instead of L-BFGS
+    content: |
+      A day-later copy of the bake-off that swaps L-BFGS for AdamW (lr 0.1, eps 1e-8, 240 single steps).
+      Weights and the 16 fixed SW projections are unchanged. At step 240 every method ends with higher content
+      loss than under L-BFGS: Gatys 4.380 vs 4.173, AdaIN 7.781 vs 6.646, SW 7.955 vs 6.256. AdaIN and SW also
+      end with higher style loss (AdaIN 2.181e-02 vs 5.493e-03, SW 1.994e-02 vs 1.259e-02). The notebook gives no
+      reason for the switch, and the markdown still says L-BFGS.
+    hypothesis: If VGG features were Gaussian, all three losses should produce visually similar outputs.
+    inferred: false
+    config: {optimizer: AdamW, lr: 0.1, eps: 1.0e-8, n_iter: 240, img_size: 384, style_w_gatys: 1.0e6, style_w_adain: 1.0e2, style_w_sw: 1.0e3, sw_n_proj: 16, seed: 42}
+    key_metrics: {gatys_content_loss_step240: 4.38, adain_content_loss_step240: 7.781, sw_content_loss_step240: 7.955, adain_style_loss_step240: 0.02181, sw_style_loss_step240: 0.01994}
+    outcome: inconclusive
+    path: 02_style_bakeoff (1).ipynb
+    derived_from: [style-content-images, vgg19-features, style-losses, sw-loss-fixed-projections, run-bakeoff-lbfgs]
+    evidence: "02_style_bakeoff (1).ipynb cell 8 (AdamW stylize, LBFGS commented out), cells 9-10 outputs (step 240 losses); compare 02_style_bakeoff.ipynb cells 10-11"
+
+  - key: run-cross-metric
+    type: run
+    title: "Cross-metric table: AdaIN output, not SW output, is closest to the style under sliced Wasserstein"
+    content: |
+      Each stylised output (L-BFGS, 250 iters, SW trained with 64 fixed projections) is scored against the
+      style features with three yardsticks: Gram MSE, AdaIN MSE and SW distance (n_proj=256). SW distance:
+      content baseline 6.27, Gatys 0.547, SW output 0.422, AdaIN output 0.147. Gatys is worse than SW on the
+      full-distribution yardstick, as predicted. But the AdaIN output beats the SW-optimised output on SW's own
+      metric by about 3x. So "SW's own SW distance is much lower" does not hold here. One plausible cause is that
+      the SW loss matched only 64 fixed directions. The notebook does not discuss this.
+    hypothesis: A full-distribution loss (SW) leaves less distributional mismatch than Gram or AdaIN; the Gatys-row/SW-column gap measures the information Gatys ignores.
+    inferred: false
+    config: {optimizer: LBFGS, max_iter: 250, sw_train_n_proj: 64, sw_eval_n_proj: 256, img_size: 384}
+    key_metrics: {sw_dist_content: 6.2687, sw_dist_gatys: 0.54723, sw_dist_adain: 0.1472, sw_dist_sw: 0.42166, gram_mse_gatys: 1.82e-06, gram_mse_sw: 1.4387e-05, adain_mse_adain: 0.004903, adain_mse_sw: 0.87431}
+    outcome: inconclusive
+    path: 03_distribution_analysis_(1).ipynb
+    derived_from: [style-content-images, vgg19-features, style-losses, sw-loss-fixed-projections, hyp-vgg-features-gaussian]
+    evidence: "03_distribution_analysis_(1).ipynb cell 5 output table (method / Gram MSE / AdaIN MSE / SW dist), cell 9 (SW trained n_proj=64), cell 10 (what to look for)"
+
+  - key: run-per-layer-sw
+    type: run
+    title: Per-layer SW distance - AdaIN output lowest at every VGG layer
+    content: |
+      The same three outputs, scored by sliced Wasserstein squared per layer (256 fresh random projections). The
+      AdaIN output is lowest at all five layers (relu1_1 3.585e-03 ... relu4_1 7.984e-02). The SW output is worse
+      than Gatys at relu1_1 (7.301e-03 vs 4.965e-03), relu3_1 (6.502e-02 vs 4.013e-02) and relu5_1 (9.786e-02 vs
+      8.264e-02), and better only at relu2_1 and relu4_1 (2.192e-01 vs 3.924e-01). Every method is far below the
+      content baseline (relu4_1 2.239).
+    hypothesis: The per-layer breakdown shows which layers the second-order approximation breaks down hardest.
+    inferred: false
+    config: {sw_eval_n_proj: 256, layers: [relu1_1, relu2_1, relu3_1, relu4_1, relu5_1]}
+    key_metrics: {sw2_relu4_1_gatys: 0.3924, sw2_relu4_1_adain: 0.07984, sw2_relu4_1_sw: 0.2192, sw2_relu4_1_content: 2.239, sw2_relu1_1_sw: 0.007301, sw2_relu1_1_gatys: 0.004965}
+    outcome: inconclusive
+    path: 03_distribution_analysis_(1).ipynb
+    derived_from: [run-cross-metric, sw-loss-fixed-projections]
+    evidence: "03_distribution_analysis_(1).ipynb cell 14 (sw_per_layer) printed output"
+
+  - key: synth-moment-vs-distribution
+    type: synthesis
+    title: "Write-up claim: moment matching is the wrong frame; distribution matching (SW) is the fix"
+    content: |
+      The notebook 03 write-up draws three claims. (1) The Gaussian assumption behind Gram/AdaIN is false at
+      every VGG layer (notebook 01, solid). (2) SW gives visibly different outputs, so non-Gaussianity matters
+      (notebook 02, visual only). (3) The Gatys-row/SW-column gap quantifies the discarded information. It
+      rejects explicit higher-order moment tensors (O(C^3)) in favour of implicit distribution matching (SW,
+      SANet/StyTR2), citing Heitz et al. CVPR 2021 and Kolkin et al. STROTSS. Claim (3) is undercut by the
+      repo's own numbers: AdaIN's output beats the SW output on the SW yardstick, both overall and at every layer.
+    hypothesis: The moment-matching frame was the wrong frame; distribution-matching is.
+    inferred: false
+    config: null
+    key_metrics: null
+    outcome: inconclusive
+    path: 03_distribution_analysis_(1).ipynb
+    derived_from: [run-gaussianity-test, run-bakeoff-lbfgs, run-cross-metric, run-per-layer-sw]
+    evidence: "03_distribution_analysis_(1).ipynb cell 16 ('The write-up section'); contradicting numbers in cell 5 and cell 14 outputs"
